@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS Healthcare</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo-container">
+      <i class="fas fa-heartbeat logo-icon"></i>
+      <span class="logo-text">NEXUS</span>
+    </div>
+    <nav>
+      <ul>
+        <li onclick="switchTab('home')" class="active" data-tab="home"><i class="fas fa-home"></i> Home</li>
+        <li onclick="switchTab('dashboard')" data-tab="dashboard"><i class="fas fa-chart-pie"></i> Dashboard</li>
+        <li onclick="switchTab('doctor')" data-tab="doctor"><i class="fas fa-user-md"></i> Doctor Portal</li>
+        <li onclick="switchTab('admissions')" data-tab="admissions"><i class="fas fa-hospital-user"></i> Admissions</li>
+        <li onclick="switchTab('appointments')" data-tab="appointments"><i class="fas fa-calendar-check"></i> Appointments</li>
+        <li onclick="switchTab('contacts')" data-tab="contacts"><i class="fas fa-envelope"></i> Contact</li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="viewport">
+    <section id="home-view" class="view-section active-section">
+      <div class="hero-bg"></div>
+      <div class="hero-content">
+        <h1 class="hero-title">Next-Gen Healthcare<br>Management</h1>
+        <p class="hero-subtitle">Streamline patient care, admissions, and doctor workflows with our intelligent health OS.</p>
+        <div class="hero-buttons">
+          <button onclick="switchTab('dashboard')" class="btn-primary">View Dashboard <i class="fas fa-arrow-right"></i></button>
+          <button onclick="switchTab('doctor')" class="btn-secondary">Doctor Login</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="dashboard-view" class="view-section">
+      <div class="page-header">
+        <div><h2>Hospital Overview</h2><p>Real-time operational status</p></div>
+        <div id="clock" class="clock"></div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card border-blue"><div class="stat-icon bg-blue"><i class="fas fa-user-md"></i></div><div class="stat-info"><h3>Doctors Clocked In</h3><p id="doctor-count">—</p></div></div>
+        <div class="stat-card border-purple"><div class="stat-icon bg-purple"><i class="fas fa-bed"></i></div><div class="stat-info"><h3>Patients Admitted</h3><p id="admitted-count">—</p></div></div>
+        <div class="stat-card border-cyan"><div class="stat-icon bg-cyan"><i class="fas fa-door-open"></i></div><div class="stat-info"><h3>Discharges Today</h3><p id="discharge-count">—</p></div></div>
+        <div class="stat-card border-green"><div class="stat-icon bg-green"><i class="fas fa-heartbeat"></i></div><div class="stat-info"><h3>Stable</h3><p id="stable-count">—</p></div></div>
+        <div class="stat-card border-red"><div class="stat-icon bg-red"><i class="fas fa-ambulance"></i></div><div class="stat-info"><h3>Critical</h3><p id="critical-count">—</p></div></div>
+        <div class="stat-card border-orange"><div class="stat-icon bg-orange"><i class="fas fa-procedures"></i></div><div class="stat-info"><h3>Recovering</h3><p id="recovering-count">—</p></div></div>
+        <div class="stat-card span-2 border-teal"><div class="stat-icon bg-teal"><i class="fas fa-clock"></i></div><div class="stat-info"><h3>Doctor On Duty</h3><p id="current-doctor">—</p></div></div>
+      </div>
+    </section>
+
+    <section id="doctor-view" class="view-section">
+      <div id="doctor-login" class="login-container">
+        <div class="login-card">
+          <div class="login-header"><i class="fas fa-shield-alt"></i><h2>Doctor Verification</h2><p>Access patient records securely</p></div>
+          <div class="form-group"><input id="doc-username" type="text" required><label>Username</label></div>
+          <div class="form-group"><input id="doc-password" type="password" required><label>Password</label></div>
+          <button onclick="loginDoctor()" class="btn-primary full-width">Authenticate <i class="fas fa-lock"></i></button>
+        </div>
+      </div>
+      <div id="doctor-dashboard" style="display:none;">
+        <div class="page-header">
+          <div><h2 id="doc-welcome">Welcome, Doctor</h2><p>Your portal overview</p></div>
+          <button onclick="logoutDoctor()" class="btn-secondary"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
+        
+        <h3 class="section-title"><i class="fas fa-users"></i> My Patients</h3>
+        <div id="doctor-patients-list" class="patients-list-container"></div>
+
+        <h3 class="section-title" style="margin-top:32px"><i class="fas fa-calendar-check"></i> My Appointments</h3>
+        <div id="doctor-appointments-list" class="patients-list-container"></div>
+
+        <h3 class="section-title" style="margin-top:32px"><i class="fas fa-headset"></i> Helpdesk Inbox <span class="muted-text">(Shared)</span></h3>
+        <p class="section-subtitle">Patient queries. Whichever doctor is free can answer.</p>
+        <div id="doctor-contacts-list" class="patients-list-container"></div>
+      </div>
+    </section>
+
+    <section id="admissions-view" class="view-section">
+      <div class="page-header"><div><h2>Patient Admissions</h2><p>Register a new patient</p></div></div>
+      <div class="wizard-container">
+        <div class="progress-bar"><div id="progress-1" class="progress-step active"></div><div id="progress-2" class="progress-step"></div><div id="progress-3" class="progress-step"></div></div>
+        <div class="wizard-step active" id="step-1">
+          <div class="form-group"><input id="p-name" type="text" required><label>Full Name</label></div>
+          <div class="form-group"><input id="p-age" type="number" min="0" max="120" required><label>Age</label></div>
+          <div class="form-group"><input id="p-dateAdmitted" type="date" required><label>Date Admitted</label></div>
+          <div class="form-group"><input id="p-dateDischarge" type="date"><label>Planned Discharge</label></div>
+          <button class="btn-primary full-width" onclick="nextStep(2)">Next Step <i class="fas fa-arrow-right"></i></button>
+        </div>
+        <div class="wizard-step" id="step-2">
+          <div class="form-group"><select id="p-blood" required><option value="" disabled selected></option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select><label>Blood Type</label></div>
+          <div class="form-group"><input id="p-cond" type="text" required><label>Diagnosis</label></div>
+          <div class="form-group"><select id="p-doc" required><option value="" disabled selected></option><option value="nirved">Dr. Nirved</option><option value="riya">Dr. Riya</option><option value="aaradhya">Dr. Aaradhya</option><option value="vedhya">Dr. Vedhya</option></select><label>Assign Doctor</label></div>
+          <div class="btn-row"><button class="btn-secondary" onclick="prevStep(1)"><i class="fas fa-arrow-left"></i> Back</button><button class="btn-primary" onclick="nextStep(3)">Next <i class="fas fa-arrow-right"></i></button></div>
+        </div>
+        <div class="wizard-step" id="step-3">
+          <div class="form-group"><select id="p-status" required><option value="stable">Stable</option><option value="critical">Critical</option><option value="recovering">Recovering</option></select><label>Patient Status</label></div>
+          <div class="btn-row"><button class="btn-secondary" onclick="prevStep(2)"><i class="fas fa-arrow-left"></i> Back</button><button class="btn-primary" onclick="addPatient()">Submit <i class="fas fa-check"></i></button></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="appointments-view" class="view-section">
+      <div class="page-header"><div><h2>Book Appointment</h2><p>Schedule a consultation</p></div></div>
+      <div class="glass-card form-card">
+        <div class="form-group"><input id="appt-name" type="text" required><label>Patient Name</label></div>
+        <div class="form-group"><input id="appt-date" type="date" required><label>Preferred Date</label></div>
+        <div class="form-group"><select id="appt-doc" required><option value="" disabled selected></option><option value="nirved">Dr. Nirved</option><option value="riya">Dr. Riya</option><option value="aaradhya">Dr. Aaradhya</option><option value="vedhya">Dr. Vedhya</option></select><label>Select Doctor</label></div>
+        <button onclick="bookAppointment()" class="btn-primary full-width">Confirm Appointment <i class="fas fa-calendar-plus"></i></button>
+      </div>
+    </section>
+
+    <section id="contacts-view" class="view-section">
+      <div class="page-header"><div><h2>Contact Us</h2><p>We're here to help</p></div></div>
+      <div class="glass-card form-card">
+        <form id="contact-form">
+          <div class="form-group"><input id="contact-name" type="text" required><label>Your Name</label></div>
+          <div class="form-group"><input id="contact-email" type="email" required><label>Your Email</label></div>
+          <div class="form-group textarea-group"><textarea id="contact-msg" required></textarea><label>Your Message</label></div>
+          <button type="submit" class="btn-primary full-width">Send Message <i class="fas fa-paper-plane"></i></button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="overlay" class="overlay" style="display:none;">
+    <div class="overlay-card">
+      <div class="overlay-header"><h2>Patient Details</h2><button onclick="closeOverlay()" class="close-btn"><i class="fas fa-times"></i></button></div>
+      <div class="overlay-body">
+        <div class="form-group"><input id="overlay-name" type="text" required><label>Name</label></div>
+        <div class="form-row"><div class="form-group"><input id="overlay-age" type="number" min="0" required><label>Age</label></div><div class="form-group"><select id="overlay-blood"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select><label>Blood Type</label></div></div>
+        <div class="form-group"><input id="overlay-cond" type="text" required><label>Diagnosis</label></div>
+        <div class="form-row"><div class="form-group"><select id="overlay-doc"><option value="nirved">Dr. Nirved</option><option value="riya">Dr. Riya</option><option value="aaradhya">Dr. Aaradhya</option><option value="vedhya">Dr. Vedhya</option></select><label>Doctor</label></div><div class="form-group"><select id="overlay-status"><option value="stable">Stable</option><option value="recovering">Recovering</option><option value="critical">Critical</option></select><label>Status</label></div></div>
+        <div class="form-row"><div class="form-group"><input id="overlay-dateAdmitted" type="date"><label>Admitted</label></div><div class="form-group"><input id="overlay-dateDischarge" type="date"><label>Discharge</label></div></div>
+      </div>
+      <div class="overlay-footer">
+        <button onclick="closeOverlay()" class="btn-secondary">Cancel</button>
+        <button onclick="submitOverlayUpdate()" class="btn-primary">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+  <script src="script.js"></script>
+</body>
+</html>
