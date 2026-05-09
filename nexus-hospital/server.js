@@ -155,9 +155,6 @@ const PORT = process.env.PORT || 5000;
 // Use cloud database if available, otherwise use local database
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/health_nexus';
 
-// Use cloud database if available, otherwise use local database
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/health_nexus';
-
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log("✅ MongoDB connected successfully");
