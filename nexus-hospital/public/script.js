@@ -1,7 +1,8 @@
 let currentPatientId = null;
 window.currentData = [];
 let loggedInDoctor = null;
-let currentPostponeId = null; // For postponing appointments
+let currentPostponeId = null;
+let currentRescheduleId = null;
 
 try { loggedInDoctor = JSON.parse(localStorage.getItem('nexusDoctor')); } catch(e) { localStorage.removeItem('nexusDoctor'); }
 
@@ -36,6 +37,7 @@ function switchTab(tab) {
   document.querySelector(`.sidebar nav li[data-tab="${tab}"]`).classList.add('active');
   if (tab === 'dashboard') fetchStats();
   if (tab === 'doctor') checkDoctorLogin();
+  if (tab === 'appointments') fetchMyAppointments();
 }
 
 function updateClock() { const el = document.getElementById('clock'); if (el) el.innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
@@ -76,11 +78,15 @@ async function fetchDoctorPatients() {
 
 async function fetchDoctorAppointments() {
   if (!loggedInDoctor) return;
-  try { const data = await safeFetch(`/api/doctors/${loggedInDoctor.username}/appointments`); renderAppointmentsList(data); } catch (err) { showToast(err.message, "error"); }
+  try { const data = await safeFetch(`/api/doctors/${loggedInDoctor.username}/appointments`); renderAppointmentsList(data, 'doctor-appointments-list', true); } catch (err) { showToast(err.message, "error"); }
 }
 
 async function fetchDoctorContacts() {
   try { const data = await safeFetch('/api/contacts'); renderContactsList(data); } catch (err) { showToast(err.message, "error"); }
+}
+
+async function fetchMyAppointments() {
+  try { const data = await safeFetch('/api/appointments'); renderAppointmentsList(data, 'my-appointments-list', false); } catch (err) { showToast(err.message, "error"); }
 }
 
 function renderPatientList(patients) {
@@ -96,8 +102,8 @@ function renderPatientList(patients) {
     </div>`).join('');
 }
 
-function renderAppointmentsList(appts) {
-  const container = document.getElementById('doctor-appointments-list');
+function renderAppointmentsList(appts, containerId, isDoctor) {
+  const container = document.getElementById(containerId);
   if (!appts.length) { container.innerHTML = `<div class="glass-card" style="padding:20px; text-align:center; color:var(--text-muted)">No appointments scheduled.</div>`; return; }
   
   const today = new Date(); today.setHours(0,0,0,0);
@@ -106,21 +112,23 @@ function renderAppointmentsList(appts) {
     let statusClass = "status-upcoming"; let statusText = "Scheduled";
     
     if (a.status === 'postponed') {
-      statusClass = "status-past"; statusText = `Postponed to ${formatDate(a.postponeDate)}`;
+      statusClass = "status-past"; statusText = `Rescheduled to ${formatDate(a.date)}`;
     } else if (apptDate.getTime() === today.getTime()) { 
       statusClass = "status-today"; statusText = "Today"; 
     } else if (apptDate < today) { 
       statusClass = "status-past"; statusText = "Past"; 
     }
 
+    const doctorInfo = isDoctor ? '' : `<span style="font-size:12px; color:var(--text-muted)">(Dr. ${titleCase(a.doctor)})</span>`;
+
     return `
     <div class="appt-row">
       <div class="appt-meta">
         <div class="appt-avatar"><i class="fas fa-calendar"></i></div>
-        <div style="min-width:0"><div class="appt-name">${a.patientName} <span style="font-size:12px; color:var(--text-muted)">(Original: ${formatDate(a.date)})</span></div><div class="appt-date">${statusText}</div></div>
+        <div style="min-width:0"><div class="appt-name">${a.patientName} ${doctorInfo}</div><div class="appt-date">Date: ${formatDate(a.date)} - <strong style="color:var(--accent)">${statusText}</strong></div></div>
       </div>
       <div style="display:flex; gap:8px; align-items:center;">
-        ${a.status !== 'postponed' ? `<button class="btn-secondary" style="padding:6px 12px; font-size:12px" onclick="openPostpone('${a._id}')"><i class="fas fa-clock"></i> Postpone</button>` : ''}
+        ${a.status !== 'postponed' ? `<button class="btn-secondary" style="padding:6px 12px; font-size:12px" onclick="${isDoctor ? `openPostpone('${a._id}')` : `openReschedule('${a._id}')`}"><i class="fas fa-clock"></i> ${isDoctor ? 'Postpone' : 'Reschedule'}</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -151,16 +159,29 @@ async function submitPostpone() {
   if (!currentPostponeId) return;
   const postponeDate = document.getElementById('postpone-date').value;
   if (!postponeDate) { showToast("Please select a new date.", "error"); return; }
-  
   try {
-    await safeFetch(`/api/appointments/${currentPostponeId}/postpone`, { 
-      method: 'PUT', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ postponeDate }) 
-    });
+    await safeFetch(`/api/appointments/${currentPostponeId}/postpone`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postponeDate }) });
     document.getElementById('postpone-modal').style.display = 'none';
     fetchDoctorAppointments(); 
     showToast("Appointment postponed!", "success"); 
+  } catch (err) { showToast(err.message, "error"); }
+}
+
+function openReschedule(id) {
+  currentRescheduleId = id;
+  document.getElementById('reschedule-date').value = '';
+  document.getElementById('reschedule-modal').style.display = 'block';
+}
+
+async function submitReschedule() {
+  if (!currentRescheduleId) return;
+  const rescheduleDate = document.getElementById('reschedule-date').value;
+  if (!rescheduleDate) { showToast("Please select a new date.", "error"); return; }
+  try {
+    await safeFetch(`/api/appointments/${currentRescheduleId}/postpone`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postponeDate: rescheduleDate }) });
+    document.getElementById('reschedule-modal').style.display = 'none';
+    fetchMyAppointments(); 
+    showToast("Reschedule requested!", "success"); 
   } catch (err) { showToast(err.message, "error"); }
 }
 
@@ -181,25 +202,23 @@ async function submitOverlayUpdate() {
   if (!currentPatientId) return;
   const dateAdmitted = document.getElementById('overlay-dateAdmitted').value;
   const dateDischarge = document.getElementById('overlay-dateDischarge').value;
-  
-  // Client-side validation for dates
   if (dateAdmitted && dateDischarge && new Date(dateDischarge) < new Date(dateAdmitted)) {
-    showToast("Discharge date cannot be before admission date.", "error");
-    return;
+    showToast("Discharge date cannot be before admission date.", "error"); return;
   }
-
   const body = { 
-    name: document.getElementById('overlay-name').value.trim(), 
-    age: document.getElementById('overlay-age').value, 
-    bloodType: document.getElementById('overlay-blood').value, 
-    condition: document.getElementById('overlay-cond').value.trim(), 
-    doctorInCharge: document.getElementById('overlay-doc').value, 
-    status: document.getElementById('overlay-status').value, 
-    dateAdmitted: dateAdmitted, 
-    dateDischarge: dateDischarge,
+    name: document.getElementById('overlay-name').value.trim(), age: document.getElementById('overlay-age').value, 
+    bloodType: document.getElementById('overlay-blood').value, condition: document.getElementById('overlay-cond').value.trim(), 
+    doctorInCharge: document.getElementById('overlay-doc').value, status: document.getElementById('overlay-status').value, 
+    dateAdmitted: dateAdmitted, dateDischarge: dateDischarge,
     emergencyPhone: document.getElementById('overlay-phone').value.trim() || 'N/A'
   };
   try { await safeFetch(`/api/patients/${currentPatientId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); closeOverlay(); fetchStats(); fetchDoctorPatients(); showToast("Patient updated!", "success"); } catch (err) { showToast(err.message, "error"); }
+}
+
+async function deletePatient() {
+  if (!currentPatientId) return;
+  if (!confirm("Are you sure you want to delete this patient? This cannot be undone.")) return;
+  try { await safeFetch(`/api/patients/${currentPatientId}`, { method: 'DELETE' }); closeOverlay(); fetchStats(); fetchDoctorPatients(); showToast("Patient deleted", "info"); } catch (err) { showToast(err.message, "error"); }
 }
 
 function nextStep(step) { document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active')); document.getElementById(`step-${step}`).classList.add('active'); document.querySelectorAll('.progress-step').forEach((p, i) => p.classList.toggle('active', i < step)); }
@@ -209,13 +228,11 @@ function resetAdmissionsForm() { ['p-name','p-age','p-dateAdmitted','p-dateDisch
 async function addPatient() {
   const name = document.getElementById('p-name').value.trim(); const age = document.getElementById('p-age').value;
   if (!name || !age) { showToast("Name and age are required.", "error"); prevStep(1); return; }
-  
   const dateAdmitted = document.getElementById('p-dateAdmitted').value;
   const dateDischarge = document.getElementById('p-dateDischarge').value;
   if (dateAdmitted && dateDischarge && new Date(dateDischarge) < new Date(dateAdmitted)) {
     showToast("Discharge date cannot be before admission date.", "error"); return;
   }
-
   const body = { name, age, bloodType: document.getElementById('p-blood').value, condition: document.getElementById('p-cond').value.trim(), doctorInCharge: document.getElementById('p-doc').value, status: document.getElementById('p-status').value, dateAdmitted: dateAdmitted, dateDischarge: dateDischarge, emergencyPhone: document.getElementById('p-phone').value.trim() || 'N/A' };
   try { await safeFetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); resetAdmissionsForm(); switchTab('dashboard'); showToast("Patient admitted!", "success"); } catch (err) { showToast(err.message, "error"); }
 }
@@ -223,7 +240,7 @@ async function addPatient() {
 async function bookAppointment() {
   const patientName = document.getElementById('appt-name').value.trim(); const date = document.getElementById('appt-date').value; const doctor = document.getElementById('appt-doc').value;
   if (!patientName || !date || !doctor) { showToast("Please fill in all fields.", "error"); return; }
-  try { await safeFetch('/api/appointments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientName, date, doctor }) }); document.getElementById('appt-name').value = ''; document.getElementById('appt-date').value = ''; document.getElementById('appt-doc').selectedIndex = 0; showToast("Appointment booked!", "success"); } catch (err) { showToast(err.message, "error"); }
+  try { await safeFetch('/api/appointments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientName, date, doctor }) }); document.getElementById('appt-name').value = ''; document.getElementById('appt-date').value = ''; document.getElementById('appt-doc').selectedIndex = 0; showToast("Appointment booked!", "success"); fetchMyAppointments(); } catch (err) { showToast(err.message, "error"); }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -231,22 +248,5 @@ document.addEventListener("DOMContentLoaded", () => {
   if (form) { form.addEventListener("submit", async (e) => { e.preventDefault(); const name = document.getElementById('contact-name').value.trim(); const email = document.getElementById('contact-email').value.trim(); const message = document.getElementById('contact-msg').value.trim(); if (!name || !email || !message) { showToast("Please fill in all fields.", "error"); return; } try { await safeFetch('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, message }) }); showToast("Message sent to Helpdesk!", "success"); form.reset(); } catch (err) { showToast(err.message, "error"); } }); }
   fetchStats(); setInterval(fetchStats, 30000);
 });
-async function deletePatient() {
-  if (!currentPatientId) return;
-  
-  // Confirm before deleting
-  if (!confirm("Are you sure you want to delete this patient? This cannot be undone.")) {
-    return; // If they click "Cancel", stop here
-  }
 
-  try {
-    await safeFetch(`/api/patients/${currentPatientId}`, { method: 'DELETE' });
-    closeOverlay();
-    fetchStats(); 
-    fetchDoctorPatients(); 
-    showToast("Patient deleted", "info");
-  } catch (err) { 
-    showToast(err.message, "error"); 
-  }
-}
 function showToast(message, type = "info") { const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.innerText = message; container.appendChild(toast); setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(40px)'; toast.style.transition = 'all 0.3s'; setTimeout(() => toast.remove(), 300); }, 3500); }

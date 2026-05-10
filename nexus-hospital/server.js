@@ -7,7 +7,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Patient Schema with Emergency Phone
+// Patient Schema
 const PatientSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   age: { type: Number, required: true, min: 0, max: 150 },
@@ -23,7 +23,7 @@ const PatientSchema = new mongoose.Schema({
 PatientSchema.pre('findOneAndUpdate', function(next) { this.set({ lastUpdated: new Date() }); next(); });
 const Patient = mongoose.model('Patient', PatientSchema);
 
-// Appointment Schema with Status and Postpone Date
+// Appointment Schema
 const AppointmentSchema = new mongoose.Schema({
   patientName: { type: String, required: true, trim: true },
   doctor: { type: String, required: true, trim: true },
@@ -34,6 +34,7 @@ const AppointmentSchema = new mongoose.Schema({
 });
 const Appointment = mongoose.model('Appointment', AppointmentSchema);
 
+// Contact Schema
 const ContactSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, trim: true },
@@ -42,6 +43,7 @@ const ContactSchema = new mongoose.Schema({
 });
 const Contact = mongoose.model('Contact', ContactSchema);
 
+// Doctor Schema (No hashing)
 const DoctorSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
   password: { type: String, required: true },
@@ -54,15 +56,14 @@ const sanitizeBody = (req, res, next) => {
   next();
 };
 
-// Prevent crashes if DB disconnects
 const checkDB = (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({ error: 'Database is not connected. Please check your MongoDB terminal.' });
+    return res.status(503).json({ error: 'Database is not connected.' });
   }
   next();
 };
 
-// Login (Plain text password - no hashing)
+// Login Route
 app.post('/api/auth/login', checkDB, async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -72,6 +73,7 @@ app.post('/api/auth/login', checkDB, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Stats Route
 app.get('/api/stats', checkDB, async (req, res) => {
   try {
     const [doctorsClockedIn, patientsAdmitted, stableCount, criticalCount, recoveringCount] = await Promise.all([
@@ -90,23 +92,13 @@ app.get('/api/stats', checkDB, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Patient Routes
 app.post('/api/patients', checkDB, sanitizeBody, async (req, res) => {
   try { const p = new Patient(req.body); await p.save(); res.status(201).json(p); } catch (err) { res.status(400).json({ error: err.message }); }
 });
-
 app.get('/api/doctors/:username/patients', checkDB, async (req, res) => {
   try { const patients = await Patient.find({ doctorInCharge: req.params.username }).sort({dateAdmitted: -1}); res.json(patients); } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
-app.get('/api/doctors/:username/appointments', checkDB, async (req, res) => {
-  try { const appts = await Appointment.find({ doctor: req.params.username }).sort({ date: 1 }); res.json(appts); } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/contacts', checkDB, async (req, res) => {
-  try { const msgs = await Contact.find().sort({ createdAt: -1 }).limit(30); res.json(msgs); } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Update Patient with Date Validation
 app.put('/api/patients/:id', checkDB, sanitizeBody, async (req, res) => {
   try {
     if (req.body.dateAdmitted && req.body.dateDischarge) {
@@ -119,17 +111,20 @@ app.put('/api/patients/:id', checkDB, sanitizeBody, async (req, res) => {
     res.json(updated); 
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
-
-// Delete Patient
 app.delete('/api/patients/:id', checkDB, async (req, res) => {
   try { await Patient.findByIdAndDelete(req.params.id); res.json({ message: 'Removed' }); } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// Appointment Routes
 app.post('/api/appointments', checkDB, sanitizeBody, async (req, res) => {
   try { const appt = new Appointment(req.body); await appt.save(); res.status(201).json(appt); } catch (err) { res.status(400).json({ error: err.message }); }
 });
-
-// Postpone an appointment
+app.get('/api/appointments', checkDB, async (req, res) => {
+  try { const appts = await Appointment.find().sort({ date: 1 }); res.json(appts); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/doctors/:username/appointments', checkDB, async (req, res) => {
+  try { const appts = await Appointment.find({ doctor: req.params.username }).sort({ date: 1 }); res.json(appts); } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.put('/api/appointments/:id/postpone', checkDB, async (req, res) => {
   try {
     const { postponeDate } = req.body;
@@ -144,10 +139,15 @@ app.put('/api/appointments/:id/postpone', checkDB, async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// Contact Routes
+app.get('/api/contacts', checkDB, async (req, res) => {
+  try { const msgs = await Contact.find().sort({ createdAt: -1 }).limit(30); res.json(msgs); } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.post('/api/contacts', checkDB, async (req, res) => {
   try { const msg = new Contact(req.body); await msg.save(); res.status(201).json({ message: 'Sent' }); } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// Seed Route
 app.get('/api/seed', checkDB, async (req, res) => {
   try {
     await Patient.deleteMany({}); await Doctor.deleteMany({}); await Appointment.deleteMany({}); await Contact.deleteMany({});
@@ -172,11 +172,11 @@ app.get('/api/seed', checkDB, async (req, res) => {
       { name: "General Inquiry", email: "user@test.com", message: "What are the visiting hours?" },
       { name: "Feedback", email: "patient@test.com", message: "Great service from Dr. Aaradhya!" }
     ]);
-
     res.send('<h1>Database Seeded!</h1><p>Close this tab and go back to the app.</p>');
   } catch (err) { res.status(500).send('Error seeding database: ' + err.message); }
 });
 
+// Catch-all & Server Listen
 app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found' }));
 app.use((req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 
