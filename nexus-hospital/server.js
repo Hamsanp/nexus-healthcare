@@ -159,10 +159,10 @@ app.get('/api/seed', checkDB, async (req, res) => {
   try {
     await Patient.deleteMany({}); await Doctor.deleteMany({}); await Appointment.deleteMany({}); await Contact.deleteMany({});
     await Doctor.insertMany([
-      { username: "nirved", password: "nirved123", name: "Dr. Nirved" },
-      { username: "riya", password: "riya123", name: "Dr. Riya" },
-      { username: "aaradhya", password: "aaradhya123", name: "Dr. Aaradhya" },
-      { username: "vedhya", password: "vedhya123", name: "Dr. Vedhya" }
+      { username: "nirved", password: "nirved456", name: "Dr. Nirved" },
+      { username: "riya", password: "riya456", name: "Dr. Riya" },
+      { username: "aaradhya", password: "aaradhya456", name: "Dr. Aaradhya" },
+      { username: "vedhya", password: "vedhya456", name: "Dr. Vedhya" }
     ]);
     await Patient.insertMany([
       { name: "John Doe", age: 45, bloodType: "O+", condition: "Fracture", doctorInCharge: "nirved", status: "stable", dateAdmitted: new Date(Date.now() - 86400000*2), dateDischarge: new Date(), emergencyPhone: "555-0101" },
