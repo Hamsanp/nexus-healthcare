@@ -231,5 +231,22 @@ document.addEventListener("DOMContentLoaded", () => {
   if (form) { form.addEventListener("submit", async (e) => { e.preventDefault(); const name = document.getElementById('contact-name').value.trim(); const email = document.getElementById('contact-email').value.trim(); const message = document.getElementById('contact-msg').value.trim(); if (!name || !email || !message) { showToast("Please fill in all fields.", "error"); return; } try { await safeFetch('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, message }) }); showToast("Message sent to Helpdesk!", "success"); form.reset(); } catch (err) { showToast(err.message, "error"); } }); }
   fetchStats(); setInterval(fetchStats, 30000);
 });
+async function deletePatient() {
+  if (!currentPatientId) return;
+  
+  // Confirm before deleting
+  if (!confirm("Are you sure you want to delete this patient? This cannot be undone.")) {
+    return; // If they click "Cancel", stop here
+  }
 
+  try {
+    await safeFetch(`/api/patients/${currentPatientId}`, { method: 'DELETE' });
+    closeOverlay();
+    fetchStats(); 
+    fetchDoctorPatients(); 
+    showToast("Patient deleted", "info");
+  } catch (err) { 
+    showToast(err.message, "error"); 
+  }
+}
 function showToast(message, type = "info") { const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.innerText = message; container.appendChild(toast); setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(40px)'; toast.style.transition = 'all 0.3s'; setTimeout(() => toast.remove(), 300); }, 3500); }
