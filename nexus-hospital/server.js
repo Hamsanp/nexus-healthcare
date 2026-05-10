@@ -43,7 +43,7 @@ const ContactSchema = new mongoose.Schema({
 });
 const Contact = mongoose.model('Contact', ContactSchema);
 
-// Doctor Schema (No hashing)
+// Doctor Schema
 const DoctorSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
   password: { type: String, required: true },
@@ -158,10 +158,10 @@ app.get('/api/seed', checkDB, async (req, res) => {
       { username: "vedhya", password: "vedhya456", name: "Dr. Vedhya" }
     ]);
     await Patient.insertMany([
-      { name: "John Doe", age: 45, bloodType: "O+", condition: "Fracture", doctorInCharge: "nirved", status: "stable", dateAdmitted: new Date(Date.now() - 86400000*2), dateDischarge: new Date(), emergencyPhone: "555-0101" },
-      { name: "Jane Smith", age: 32, bloodType: "A-", condition: "Flu", doctorInCharge: "riya", status: "recovering", emergencyPhone: "555-0102" },
-      { name: "Mike Johnson", age: 58, bloodType: "B+", condition: "Surgery", doctorInCharge: "aaradhya", status: "critical", emergencyPhone: "555-0103" },
-      { name: "Emily Davis", age: 28, bloodType: "AB+", condition: "Appendicitis", doctorInCharge: "vedhya", status: "stable", emergencyPhone: "555-0104" }
+      { name: "John Doe", age: 45, bloodType: "O+", condition: "Fracture", doctorInCharge: "nirved", status: "stable", dateAdmitted: new Date(Date.now() - 86400000*2), dateDischarge: new Date(), emergencyPhone: "5550101010" },
+      { name: "Jane Smith", age: 32, bloodType: "A-", condition: "Flu", doctorInCharge: "riya", status: "recovering", emergencyPhone: "5550102020" },
+      { name: "Mike Johnson", age: 58, bloodType: "B+", condition: "Surgery", doctorInCharge: "aaradhya", status: "critical", emergencyPhone: "5550103030" },
+      { name: "Emily Davis", age: 28, bloodType: "AB+", condition: "Appendicitis", doctorInCharge: "vedhya", status: "stable", emergencyPhone: "5550104040" }
     ]);
     await Appointment.insertMany([
       { patientName: "Sam Wilson", doctor: "nirved", date: new Date(Date.now() + 86400000), status: "scheduled" },

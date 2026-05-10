@@ -202,15 +202,23 @@ async function submitOverlayUpdate() {
   if (!currentPatientId) return;
   const dateAdmitted = document.getElementById('overlay-dateAdmitted').value;
   const dateDischarge = document.getElementById('overlay-dateDischarge').value;
+  const phone = document.getElementById('overlay-phone').value.trim();
+  
+  // Phone validation
+  if (phone && (phone.length !== 10 || isNaN(phone))) {
+    showToast("Emergency phone must be exactly 10 digits.", "error"); return;
+  }
+  // Date validation
   if (dateAdmitted && dateDischarge && new Date(dateDischarge) < new Date(dateAdmitted)) {
     showToast("Discharge date cannot be before admission date.", "error"); return;
   }
+
   const body = { 
     name: document.getElementById('overlay-name').value.trim(), age: document.getElementById('overlay-age').value, 
     bloodType: document.getElementById('overlay-blood').value, condition: document.getElementById('overlay-cond').value.trim(), 
     doctorInCharge: document.getElementById('overlay-doc').value, status: document.getElementById('overlay-status').value, 
     dateAdmitted: dateAdmitted, dateDischarge: dateDischarge,
-    emergencyPhone: document.getElementById('overlay-phone').value.trim() || 'N/A'
+    emergencyPhone: phone || 'N/A'
   };
   try { await safeFetch(`/api/patients/${currentPatientId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); closeOverlay(); fetchStats(); fetchDoctorPatients(); showToast("Patient updated!", "success"); } catch (err) { showToast(err.message, "error"); }
 }
@@ -226,14 +234,24 @@ function prevStep(step) { nextStep(step); }
 function resetAdmissionsForm() { ['p-name','p-age','p-dateAdmitted','p-dateDischarge','p-cond','p-phone'].forEach(id => document.getElementById(id).value = ''); document.getElementById('p-blood').selectedIndex = 0; document.getElementById('p-doc').selectedIndex = 0; document.getElementById('p-status').selectedIndex = 0; nextStep(1); }
 
 async function addPatient() {
-  const name = document.getElementById('p-name').value.trim(); const age = document.getElementById('p-age').value;
-  if (!name || !age) { showToast("Name and age are required.", "error"); prevStep(1); return; }
+  const name = document.getElementById('p-name').value.trim(); 
+  const age = document.getElementById('p-age').value;
+  const phone = document.getElementById('p-phone').value.trim();
   const dateAdmitted = document.getElementById('p-dateAdmitted').value;
   const dateDischarge = document.getElementById('p-dateDischarge').value;
+
+  if (!name || !age) { showToast("Name and age are required.", "error"); prevStep(1); return; }
+  
+  // Phone validation
+  if (phone && (phone.length !== 10 || isNaN(phone))) {
+    showToast("Emergency phone must be exactly 10 digits.", "error"); return;
+  }
+  // Date validation
   if (dateAdmitted && dateDischarge && new Date(dateDischarge) < new Date(dateAdmitted)) {
     showToast("Discharge date cannot be before admission date.", "error"); return;
   }
-  const body = { name, age, bloodType: document.getElementById('p-blood').value, condition: document.getElementById('p-cond').value.trim(), doctorInCharge: document.getElementById('p-doc').value, status: document.getElementById('p-status').value, dateAdmitted: dateAdmitted, dateDischarge: dateDischarge, emergencyPhone: document.getElementById('p-phone').value.trim() || 'N/A' };
+
+  const body = { name, age, bloodType: document.getElementById('p-blood').value, condition: document.getElementById('p-cond').value.trim(), doctorInCharge: document.getElementById('p-doc').value, status: document.getElementById('p-status').value, dateAdmitted: dateAdmitted, dateDischarge: dateDischarge, emergencyPhone: phone || 'N/A' };
   try { await safeFetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); resetAdmissionsForm(); switchTab('dashboard'); showToast("Patient admitted!", "success"); } catch (err) { showToast(err.message, "error"); }
 }
 
