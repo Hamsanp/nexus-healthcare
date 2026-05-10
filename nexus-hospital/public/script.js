@@ -204,12 +204,13 @@ async function submitOverlayUpdate() {
   const dateDischarge = document.getElementById('overlay-dateDischarge').value;
   const phone = document.getElementById('overlay-phone').value.trim();
   
-  // Phone validation
+  // 10-digit phone validation
   if (phone && (phone.length !== 10 || isNaN(phone))) {
     showToast("Emergency phone must be exactly 10 digits.", "error"); return;
   }
-  // Date validation
-  if (dateAdmitted && dateDischarge && new Date(dateDischarge) < new Date(dateAdmitted)) {
+  
+  // Date validation: Discharge is optional, but if provided, it cannot be before admission
+  if (dateDischarge && dateAdmitted && new Date(dateDischarge) < new Date(dateAdmitted)) {
     showToast("Discharge date cannot be before admission date.", "error"); return;
   }
 
@@ -242,13 +243,16 @@ async function addPatient() {
 
   if (!name || !age) { showToast("Name and age are required.", "error"); prevStep(1); return; }
   
-  // Phone validation
+  // 10-digit phone validation
   if (phone && (phone.length !== 10 || isNaN(phone))) {
     showToast("Emergency phone must be exactly 10 digits.", "error"); return;
   }
-  // Date validation
-  if (dateAdmitted && dateDischarge && new Date(dateDischarge) < new Date(dateAdmitted)) {
-    showToast("Discharge date cannot be before admission date.", "error"); return;
+
+  // Date validation: Discharge is optional, but if provided, it cannot be before admission
+  if (dateDischarge && dateAdmitted && new Date(dateDischarge) < new Date(dateAdmitted)) {
+    showToast("Discharge date cannot be before admission date.", "error"); 
+    prevStep(1); // Send them back to step 1 to fix the dates
+    return;
   }
 
   const body = { name, age, bloodType: document.getElementById('p-blood').value, condition: document.getElementById('p-cond').value.trim(), doctorInCharge: document.getElementById('p-doc').value, status: document.getElementById('p-status').value, dateAdmitted: dateAdmitted, dateDischarge: dateDischarge, emergencyPhone: phone || 'N/A' };
