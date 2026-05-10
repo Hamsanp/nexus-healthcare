@@ -98,7 +98,7 @@
           <div class="form-group"><input id="p-name" type="text" required><label>Full Name</label></div>
           <div class="form-group"><input id="p-age" type="number" min="0" max="120" required><label>Age</label></div>
           <div class="form-group"><input id="p-phone" type="tel" maxlength="10" pattern="[0-9]{10}" required><label>Emergency Phone (10 digits)</label></div>
-          <div class="form-group"><input id="p-dateAdmitted" type="date" required><label>Date Admitted</label></div>
+          <div class="form-group"><input id="p-dateAdmitted" type="date" oninput="updateDischargeMin()" required><label>Date Admitted</label></div>
           <div class="form-group"><input id="p-dateDischarge" type="date"><label>Planned Discharge</label></div>
           <button class="btn-primary full-width" onclick="nextStep(2)">Next Step <i class="fas fa-arrow-right"></i></button>
         </div>
@@ -167,7 +167,7 @@
           <div class="form-group"><select id="overlay-status"><option value="stable">Stable</option><option value="recovering">Recovering</option><option value="critical">Critical</option></select><label>Status</label></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><input id="overlay-dateAdmitted" type="date"><label>Admitted</label></div>
+          <div class="form-group"><input id="overlay-dateAdmitted" type="date" oninput="updateOverlayDischargeMin()"><label>Admitted</label></div>
           <div class="form-group"><input id="overlay-dateDischarge" type="date"><label>Discharge</label></div>
         </div>
       </div>
