@@ -1,12 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
+const crypto = require('crypto'); // Added for password hashing
 
 const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Patient Schema with Emergency Phone
 const PatientSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   age: { type: Number, required: true, min: 0, max: 150 },
@@ -16,15 +18,19 @@ const PatientSchema = new mongoose.Schema({
   status: { type: String, enum: ['stable', 'critical', 'recovering'], default: 'stable', lowercase: true },
   dateAdmitted: { type: Date, default: Date.now },
   dateDischarge: { type: Date },
+  emergencyPhone: { type: String, trim: true, default: 'N/A' }, // NEW
   lastUpdated: { type: Date, default: Date.now }
 });
 PatientSchema.pre('findOneAndUpdate', function(next) { this.set({ lastUpdated: new Date() }); next(); });
 const Patient = mongoose.model('Patient', PatientSchema);
 
+// Appointment Schema with Status and Postpone Date
 const AppointmentSchema = new mongoose.Schema({
   patientName: { type: String, required: true, trim: true },
   doctor: { type: String, required: true, trim: true },
   date: { type: Date, required: true },
+  status: { type: String, enum: ['scheduled', 'postponed'], default: 'scheduled', lowercase: true }, // NEW
+  postponeDate: { type: Date }, // NEW
   createdAt: { type: Date, default: Date.now }
 });
 const Appointment = mongoose.model('Appointment', AppointmentSchema);
@@ -42,6 +48,12 @@ const DoctorSchema = new mongoose.Schema({
   password: { type: String, required: true },
   name: { type: String, required: true, trim: true }
 });
+// Hash password before saving
+DoctorSchema.pre('save', function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = crypto.createHash('sha256').update(this.password).digest('hex');
+  next();
+});
 const Doctor = mongoose.model('Doctor', DoctorSchema);
 
 const sanitizeBody = (req, res, next) => {
@@ -57,10 +69,12 @@ const checkDB = (req, res, next) => {
   next();
 };
 
+// Login with hashed password
 app.post('/api/auth/login', checkDB, async (req, res) => {
   try {
     const { username, password } = req.body;
-    const doctor = await Doctor.findOne({ username, password });
+    const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
+    const doctor = await Doctor.findOne({ username, password: hashedPassword });
     if (!doctor) return res.status(401).json({ error: 'Invalid credentials' });
     res.json({ id: doctor._id, username: doctor.username, name: doctor.name });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -92,18 +106,26 @@ app.get('/api/doctors/:username/patients', checkDB, async (req, res) => {
   try { const patients = await Patient.find({ doctorInCharge: req.params.username }).sort({dateAdmitted: -1}); res.json(patients); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NEW: Get Appointments for a specific doctor
 app.get('/api/doctors/:username/appointments', checkDB, async (req, res) => {
   try { const appts = await Appointment.find({ doctor: req.params.username }).sort({ date: 1 }); res.json(appts); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NEW: Get all Contacts for the shared helpdesk inbox
 app.get('/api/contacts', checkDB, async (req, res) => {
   try { const msgs = await Contact.find().sort({ createdAt: -1 }).limit(30); res.json(msgs); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Update Patient with Date Validation
 app.put('/api/patients/:id', checkDB, sanitizeBody, async (req, res) => {
-  try { const updated = await Patient.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }); if (!updated) return res.status(404).json({ error: 'Not found' }); res.json(updated); } catch (err) { res.status(400).json({ error: err.message }); }
+  try {
+    if (req.body.dateAdmitted && req.body.dateDischarge) {
+      if (new Date(req.body.dateDischarge) < new Date(req.body.dateAdmitted)) {
+        return res.status(400).json({ error: 'Discharge date cannot be before admission date.' });
+      }
+    }
+    const updated = await Patient.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }); 
+    if (!updated) return res.status(404).json({ error: 'Not found' }); 
+    res.json(updated); 
+  } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
 app.delete('/api/patients/:id', checkDB, async (req, res) => {
@@ -112,6 +134,21 @@ app.delete('/api/patients/:id', checkDB, async (req, res) => {
 
 app.post('/api/appointments', checkDB, sanitizeBody, async (req, res) => {
   try { const appt = new Appointment(req.body); await appt.save(); res.status(201).json(appt); } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// NEW: Postpone an appointment
+app.put('/api/appointments/:id/postpone', checkDB, async (req, res) => {
+  try {
+    const { postponeDate } = req.body;
+    if (!postponeDate) return res.status(400).json({ error: 'New date is required' });
+    const updated = await Appointment.findByIdAndUpdate(
+      req.params.id, 
+      { date: postponeDate, status: 'postponed', postponeDate: postponeDate }, 
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Appointment not found' });
+    res.json(updated);
+  } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
 app.post('/api/contacts', checkDB, async (req, res) => {
@@ -128,23 +165,22 @@ app.get('/api/seed', checkDB, async (req, res) => {
       { username: "vedhya", password: "vedhya123", name: "Dr. Vedhya" }
     ]);
     await Patient.insertMany([
-      { name: "John Doe", age: 45, bloodType: "O+", condition: "Fracture", doctorInCharge: "nirved", status: "stable", dateDischarge: new Date() },
-      { name: "Jane Smith", age: 32, bloodType: "A-", condition: "Flu", doctorInCharge: "riya", status: "recovering" },
-      { name: "Mike Johnson", age: 58, bloodType: "B+", condition: "Surgery", doctorInCharge: "aaradhya", status: "critical" },
-      { name: "Emily Davis", age: 28, bloodType: "AB+", condition: "Appendicitis", doctorInCharge: "vedhya", status: "stable" }
+      { name: "John Doe", age: 45, bloodType: "O+", condition: "Fracture", doctorInCharge: "nirved", status: "stable", dateAdmitted: new Date(Date.now() - 86400000*2), dateDischarge: new Date(), emergencyPhone: "555-0101" },
+      { name: "Jane Smith", age: 32, bloodType: "A-", condition: "Flu", doctorInCharge: "riya", status: "recovering", emergencyPhone: "555-0102" },
+      { name: "Mike Johnson", age: 58, bloodType: "B+", condition: "Surgery", doctorInCharge: "aaradhya", status: "critical", emergencyPhone: "555-0103" },
+      { name: "Emily Davis", age: 28, bloodType: "AB+", condition: "Appendicitis", doctorInCharge: "vedhya", status: "stable", emergencyPhone: "555-0104" }
     ]);
-    // Seed some appointments and contacts for the doctor portal
     await Appointment.insertMany([
-      { patientName: "Sam Wilson", doctor: "nirved", date: new Date(Date.now() + 86400000) }, // Tomorrow
-      { patientName: "Sarah Connor", doctor: "nirved", date: new Date(Date.now() + 172800000) }, // Day after
-      { patientName: "Peter Parker", doctor: "riya", date: new Date() }
+      { patientName: "Sam Wilson", doctor: "nirved", date: new Date(Date.now() + 86400000), status: "scheduled" },
+      { patientName: "Sarah Connor", doctor: "nirved", date: new Date(Date.now() + 172800000), status: "scheduled" },
+      { patientName: "Peter Parker", doctor: "riya", date: new Date(), status: "scheduled" }
     ]);
     await Contact.insertMany([
       { name: "General Inquiry", email: "user@test.com", message: "What are the visiting hours?" },
       { name: "Feedback", email: "patient@test.com", message: "Great service from Dr. Aaradhya!" }
     ]);
 
-    res.send('<h1>Database Seeded!</h1><p>Close this tab and go to http://localhost:5000</p>');
+    res.send('<h1>Database Seeded!</h1><p>Close this tab and go back to the app.</p>');
   } catch (err) { res.status(500).send('Error seeding database: ' + err.message); }
 });
 
@@ -152,7 +188,6 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found
 app.use((req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 
 const PORT = process.env.PORT || 5000;
-// Use cloud database if available, otherwise use local database
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/health_nexus';
 
 mongoose.connect(MONGO_URI)
@@ -162,7 +197,6 @@ mongoose.connect(MONGO_URI)
   })
   .catch(err => {
     console.error("❌ FATAL ERROR: Could not connect to MongoDB.");
-    console.error("👉 Make sure your other terminal with 'mongod' is still running!");
     console.error(err.message);
     process.exit(1);
   });

@@ -105,4 +105,48 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-main); color: var
 .toast.success { border-left-color: var(--green); } .toast.error { border-left-color: var(--red); } .toast.info { border-left-color: var(--accent); }
 @keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
 
-@media (max-width: 1024px) { .sidebar { width: 80px; } .sidebar li span, .logo-text { display: none; } .viewport { margin-left: 80px; } .hero-title { font-size: 36px; } }
+/* --- RESPONSIVE / MOBILE LAYOUT --- */
+@media (max-width: 1024px) { 
+  .sidebar { width: 80px; } 
+  .sidebar li span, .logo-text { display: none; } 
+  .viewport { margin-left: 80px; } 
+  .hero-title { font-size: 36px; } 
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: fixed;
+    bottom: 0;
+    top: auto;
+    left: 0;
+    flex-direction: row;
+    padding: 8px 0;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    z-index: 1000;
+    background: var(--bg-surface);
+  }
+  .logo-container { display: none; }
+  .sidebar nav { width: 100%; }
+  .sidebar nav ul { flex-direction: row; justify-content: space-around; gap: 0; margin-bottom: 0; }
+  .sidebar nav li { flex-direction: column; padding: 8px 4px; font-size: 10px; gap: 4px; border-radius: 8px; }
+  .sidebar nav li i { font-size: 18px; width: auto; }
+  .sidebar li span { display: block !important; font-size: 10px; }
+  
+  .viewport { margin-left: 0; margin-bottom: 80px; padding: 24px 16px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .span-2 { grid-column: span 2; }
+  .form-row { flex-direction: column; gap: 0; }
+  .hero-title { font-size: 32px; }
+  .hero-subtitle { font-size: 16px; }
+  .hero-buttons { flex-direction: column; gap: 12px; }
+  .page-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .clock { align-self: stretch; text-align: center; }
+}
+
+@media (max-width: 400px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .span-2 { grid-column: span 1; }
+}

@@ -1,6 +1,7 @@
 let currentPatientId = null;
 window.currentData = [];
 let loggedInDoctor = null;
+let currentPostponeId = null; // For postponing appointments
 
 try { loggedInDoctor = JSON.parse(localStorage.getItem('nexusDoctor')); } catch(e) { localStorage.removeItem('nexusDoctor'); }
 
@@ -102,16 +103,25 @@ function renderAppointmentsList(appts) {
   const today = new Date(); today.setHours(0,0,0,0);
   container.innerHTML = appts.map(a => {
     const apptDate = new Date(a.date); apptDate.setHours(0,0,0,0);
-    let statusClass = "status-upcoming"; let statusText = "Upcoming";
-    if (apptDate.getTime() === today.getTime()) { statusClass = "status-today"; statusText = "Today"; }
-    else if (apptDate < today) { statusClass = "status-past"; statusText = "Past"; }
+    let statusClass = "status-upcoming"; let statusText = "Scheduled";
+    
+    if (a.status === 'postponed') {
+      statusClass = "status-past"; statusText = `Postponed to ${formatDate(a.postponeDate)}`;
+    } else if (apptDate.getTime() === today.getTime()) { 
+      statusClass = "status-today"; statusText = "Today"; 
+    } else if (apptDate < today) { 
+      statusClass = "status-past"; statusText = "Past"; 
+    }
+
     return `
     <div class="appt-row">
       <div class="appt-meta">
         <div class="appt-avatar"><i class="fas fa-calendar"></i></div>
-        <div style="min-width:0"><div class="appt-name">${a.patientName}</div><div class="appt-date">${formatDate(a.date)}</div></div>
+        <div style="min-width:0"><div class="appt-name">${a.patientName} <span style="font-size:12px; color:var(--text-muted)">(Original: ${formatDate(a.date)})</span></div><div class="appt-date">${statusText}</div></div>
       </div>
-      <div class="appt-status ${statusClass}">${statusText}</div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        ${a.status !== 'postponed' ? `<button class="btn-secondary" style="padding:6px 12px; font-size:12px" onclick="openPostpone('${a._id}')"><i class="fas fa-clock"></i> Postpone</button>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -131,11 +141,35 @@ function renderContactsList(contacts) {
     </div>`).join('');
 }
 
+function openPostpone(id) {
+  currentPostponeId = id;
+  document.getElementById('postpone-date').value = '';
+  document.getElementById('postpone-modal').style.display = 'block';
+}
+
+async function submitPostpone() {
+  if (!currentPostponeId) return;
+  const postponeDate = document.getElementById('postpone-date').value;
+  if (!postponeDate) { showToast("Please select a new date.", "error"); return; }
+  
+  try {
+    await safeFetch(`/api/appointments/${currentPostponeId}/postpone`, { 
+      method: 'PUT', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ postponeDate }) 
+    });
+    document.getElementById('postpone-modal').style.display = 'none';
+    fetchDoctorAppointments(); 
+    showToast("Appointment postponed!", "success"); 
+  } catch (err) { showToast(err.message, "error"); }
+}
+
 function showDetails(id) {
   currentPatientId = id; const p = window.currentData.find(x => x._id === id); if (!p) return;
   document.getElementById('overlay-name').value = getField(p, 'name'); document.getElementById('overlay-age').value = getField(p, 'age'); 
   document.getElementById('overlay-cond').value = getField(p, 'condition'); document.getElementById('overlay-doc').value = getField(p, 'doctorInCharge'); 
   document.getElementById('overlay-blood').value = getField(p, 'bloodType'); document.getElementById('overlay-status').value = getStatus(p);
+  document.getElementById('overlay-phone').value = getField(p, 'emergencyPhone') === 'N/A' ? '' : getField(p, 'emergencyPhone');
   const adm = getField(p, 'dateAdmitted'); const dis = getField(p, 'dateDischarge');
   document.getElementById('overlay-dateAdmitted').value = adm ? new Date(adm).toISOString().split('T')[0] : ""; 
   document.getElementById('overlay-dateDischarge').value = dis ? new Date(dis).toISOString().split('T')[0] : "";
@@ -145,18 +179,44 @@ function closeOverlay() { document.getElementById('overlay').style.display = 'no
 
 async function submitOverlayUpdate() {
   if (!currentPatientId) return;
-  const body = { name: document.getElementById('overlay-name').value.trim(), age: document.getElementById('overlay-age').value, bloodType: document.getElementById('overlay-blood').value, condition: document.getElementById('overlay-cond').value.trim(), doctorInCharge: document.getElementById('overlay-doc').value, status: document.getElementById('overlay-status').value, dateAdmitted: document.getElementById('overlay-dateAdmitted').value, dateDischarge: document.getElementById('overlay-dateDischarge').value };
+  const dateAdmitted = document.getElementById('overlay-dateAdmitted').value;
+  const dateDischarge = document.getElementById('overlay-dateDischarge').value;
+  
+  // Client-side validation for dates
+  if (dateAdmitted && dateDischarge && new Date(dateDischarge) < new Date(dateAdmitted)) {
+    showToast("Discharge date cannot be before admission date.", "error");
+    return;
+  }
+
+  const body = { 
+    name: document.getElementById('overlay-name').value.trim(), 
+    age: document.getElementById('overlay-age').value, 
+    bloodType: document.getElementById('overlay-blood').value, 
+    condition: document.getElementById('overlay-cond').value.trim(), 
+    doctorInCharge: document.getElementById('overlay-doc').value, 
+    status: document.getElementById('overlay-status').value, 
+    dateAdmitted: dateAdmitted, 
+    dateDischarge: dateDischarge,
+    emergencyPhone: document.getElementById('overlay-phone').value.trim() || 'N/A'
+  };
   try { await safeFetch(`/api/patients/${currentPatientId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); closeOverlay(); fetchStats(); fetchDoctorPatients(); showToast("Patient updated!", "success"); } catch (err) { showToast(err.message, "error"); }
 }
 
 function nextStep(step) { document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active')); document.getElementById(`step-${step}`).classList.add('active'); document.querySelectorAll('.progress-step').forEach((p, i) => p.classList.toggle('active', i < step)); }
 function prevStep(step) { nextStep(step); }
-function resetAdmissionsForm() { ['p-name','p-age','p-dateAdmitted','p-dateDischarge','p-cond'].forEach(id => document.getElementById(id).value = ''); document.getElementById('p-blood').selectedIndex = 0; document.getElementById('p-doc').selectedIndex = 0; document.getElementById('p-status').selectedIndex = 0; nextStep(1); }
+function resetAdmissionsForm() { ['p-name','p-age','p-dateAdmitted','p-dateDischarge','p-cond','p-phone'].forEach(id => document.getElementById(id).value = ''); document.getElementById('p-blood').selectedIndex = 0; document.getElementById('p-doc').selectedIndex = 0; document.getElementById('p-status').selectedIndex = 0; nextStep(1); }
 
 async function addPatient() {
   const name = document.getElementById('p-name').value.trim(); const age = document.getElementById('p-age').value;
   if (!name || !age) { showToast("Name and age are required.", "error"); prevStep(1); return; }
-  const body = { name, age, bloodType: document.getElementById('p-blood').value, condition: document.getElementById('p-cond').value.trim(), doctorInCharge: document.getElementById('p-doc').value, status: document.getElementById('p-status').value, dateAdmitted: document.getElementById('p-dateAdmitted').value, dateDischarge: document.getElementById('p-dateDischarge').value };
+  
+  const dateAdmitted = document.getElementById('p-dateAdmitted').value;
+  const dateDischarge = document.getElementById('p-dateDischarge').value;
+  if (dateAdmitted && dateDischarge && new Date(dateDischarge) < new Date(dateAdmitted)) {
+    showToast("Discharge date cannot be before admission date.", "error"); return;
+  }
+
+  const body = { name, age, bloodType: document.getElementById('p-blood').value, condition: document.getElementById('p-cond').value.trim(), doctorInCharge: document.getElementById('p-doc').value, status: document.getElementById('p-status').value, dateAdmitted: dateAdmitted, dateDischarge: dateDischarge, emergencyPhone: document.getElementById('p-phone').value.trim() || 'N/A' };
   try { await safeFetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); resetAdmissionsForm(); switchTab('dashboard'); showToast("Patient admitted!", "success"); } catch (err) { showToast(err.message, "error"); }
 }
 
