@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
-const crypto = require('crypto'); // Added for password hashing
 
 const app = express();
 
@@ -18,7 +17,7 @@ const PatientSchema = new mongoose.Schema({
   status: { type: String, enum: ['stable', 'critical', 'recovering'], default: 'stable', lowercase: true },
   dateAdmitted: { type: Date, default: Date.now },
   dateDischarge: { type: Date },
-  emergencyPhone: { type: String, trim: true, default: 'N/A' }, // NEW
+  emergencyPhone: { type: String, trim: true, default: 'N/A' },
   lastUpdated: { type: Date, default: Date.now }
 });
 PatientSchema.pre('findOneAndUpdate', function(next) { this.set({ lastUpdated: new Date() }); next(); });
@@ -29,8 +28,8 @@ const AppointmentSchema = new mongoose.Schema({
   patientName: { type: String, required: true, trim: true },
   doctor: { type: String, required: true, trim: true },
   date: { type: Date, required: true },
-  status: { type: String, enum: ['scheduled', 'postponed'], default: 'scheduled', lowercase: true }, // NEW
-  postponeDate: { type: Date }, // NEW
+  status: { type: String, enum: ['scheduled', 'postponed'], default: 'scheduled', lowercase: true },
+  postponeDate: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });
 const Appointment = mongoose.model('Appointment', AppointmentSchema);
@@ -48,12 +47,6 @@ const DoctorSchema = new mongoose.Schema({
   password: { type: String, required: true },
   name: { type: String, required: true, trim: true }
 });
-// Hash password before saving
-DoctorSchema.pre('save', function(next) {
-  if (!this.isModified('password')) return next();
-  this.password = crypto.createHash('sha256').update(this.password).digest('hex');
-  next();
-});
 const Doctor = mongoose.model('Doctor', DoctorSchema);
 
 const sanitizeBody = (req, res, next) => {
@@ -69,12 +62,11 @@ const checkDB = (req, res, next) => {
   next();
 };
 
-// Login with hashed password
+// Login (Plain text password - no hashing)
 app.post('/api/auth/login', checkDB, async (req, res) => {
   try {
     const { username, password } = req.body;
-    const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
-    const doctor = await Doctor.findOne({ username, password: hashedPassword });
+    const doctor = await Doctor.findOne({ username, password });
     if (!doctor) return res.status(401).json({ error: 'Invalid credentials' });
     res.json({ id: doctor._id, username: doctor.username, name: doctor.name });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -128,6 +120,7 @@ app.put('/api/patients/:id', checkDB, sanitizeBody, async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// Delete Patient
 app.delete('/api/patients/:id', checkDB, async (req, res) => {
   try { await Patient.findByIdAndDelete(req.params.id); res.json({ message: 'Removed' }); } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -136,7 +129,7 @@ app.post('/api/appointments', checkDB, sanitizeBody, async (req, res) => {
   try { const appt = new Appointment(req.body); await appt.save(); res.status(201).json(appt); } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// NEW: Postpone an appointment
+// Postpone an appointment
 app.put('/api/appointments/:id/postpone', checkDB, async (req, res) => {
   try {
     const { postponeDate } = req.body;
