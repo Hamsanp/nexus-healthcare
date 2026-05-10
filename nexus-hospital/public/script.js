@@ -30,6 +30,20 @@ function titleCase(v) { const s = String(v||"").toLowerCase(); return s ? s.char
 function formatDate(val) { if (!val) return "N/A"; const d = new Date(val); return isNaN(d) ? "N/A" : d.toLocaleDateString(); }
 function getInitials(name) { return name.split(' ').map(n => n[0]).join('').toUpperCase(); }
 
+// Date Blocking Functions
+function updateDischargeMin() {
+  const admitDate = document.getElementById('p-dateAdmitted').value;
+  if (admitDate) {
+    document.getElementById('p-dateDischarge').min = admitDate;
+  }
+}
+function updateOverlayDischargeMin() {
+  const admitDate = document.getElementById('overlay-dateAdmitted').value;
+  if (admitDate) {
+    document.getElementById('overlay-dateDischarge').min = admitDate;
+  }
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active-section'));
   document.getElementById(`${tab}-view`).classList.add('active-section');
@@ -194,6 +208,10 @@ function showDetails(id) {
   const adm = getField(p, 'dateAdmitted'); const dis = getField(p, 'dateDischarge');
   document.getElementById('overlay-dateAdmitted').value = adm ? new Date(adm).toISOString().split('T')[0] : ""; 
   document.getElementById('overlay-dateDischarge').value = dis ? new Date(dis).toISOString().split('T')[0] : "";
+  
+  // Set minimum date for discharge calendar on overlay open
+  if (adm) document.getElementById('overlay-dateDischarge').min = new Date(adm).toISOString().split('T')[0];
+  
   document.getElementById('overlay').style.display = 'flex';
 }
 function closeOverlay() { document.getElementById('overlay').style.display = 'none'; currentPatientId = null; }
@@ -207,11 +225,6 @@ async function submitOverlayUpdate() {
   // 10-digit phone validation
   if (phone && (phone.length !== 10 || isNaN(phone))) {
     showToast("Emergency phone must be exactly 10 digits.", "error"); return;
-  }
-  
-  // Date validation: Discharge is optional, but if provided, it cannot be before admission
-  if (dateDischarge && dateAdmitted && new Date(dateDischarge) < new Date(dateAdmitted)) {
-    showToast("Discharge date cannot be before admission date.", "error"); return;
   }
 
   const body = { 
@@ -246,13 +259,6 @@ async function addPatient() {
   // 10-digit phone validation
   if (phone && (phone.length !== 10 || isNaN(phone))) {
     showToast("Emergency phone must be exactly 10 digits.", "error"); return;
-  }
-
-  // Date validation: Discharge is optional, but if provided, it cannot be before admission
-  if (dateDischarge && dateAdmitted && new Date(dateDischarge) < new Date(dateAdmitted)) {
-    showToast("Discharge date cannot be before admission date.", "error"); 
-    prevStep(1); // Send them back to step 1 to fix the dates
-    return;
   }
 
   const body = { name, age, bloodType: document.getElementById('p-blood').value, condition: document.getElementById('p-cond').value.trim(), doctorInCharge: document.getElementById('p-doc').value, status: document.getElementById('p-status').value, dateAdmitted: dateAdmitted, dateDischarge: dateDischarge, emergencyPhone: phone || 'N/A' };
